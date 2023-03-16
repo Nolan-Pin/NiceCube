@@ -5,21 +5,30 @@ Represente les parties du panneau decouvert
 La matrice qui stoque les coordonnees est de la forme: lumiereMat[y][x]
 """
 class DiscoveredSign:
-    def __init__(self,inputW,inputH):
-        self.width = inputW
-        self.height = inputH
+    def __init__(self):
+        self.width = 0
+        self.height = 0
         self.center = [0, 0]
         self.light_map = None
 
-        self.threshold_intensity = 150
+        self.threshold_intensity = 100
         
         self.saved_image = None
+        pass
 
+    
+    def initialization(self, height, width):
+        self.width = height
+        self.height = width
         self.resetLight()
         pass
 
     def getCenter(self):
         return self.center[0], self.center[1]
+    
+    def set_threshold(self, new_value):
+        self.threshold_intensity = int(new_value)
+        pass
     
     def detectReflexion(self, image1):
         """
@@ -44,7 +53,8 @@ class DiscoveredSign:
         # the saved image takes the new image input for the next call of the function
         self.saved_image = image1
 
-        new_mat = cv2.subtract(image2, image1)
+        new_mat = cv2.absdiff(image2, image1)
+
         th, new_mat = cv2.threshold(new_mat, self.threshold_intensity, 255, cv2.THRESH_BINARY)
         return new_mat
     

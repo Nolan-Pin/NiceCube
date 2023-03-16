@@ -12,14 +12,14 @@ import discovered_sign
 
 class UI:
     def __init__(self, circle_threshold, path_to_dll) -> None:
-        self.widgets = {}                   # holds all the widgets of the window
-        self.thread = [None, None]                    # list of thread for the computation
-        self.play = False                   # current state of the webcam
+        self.widgets = {}                                   # holds all the widgets of the window
+        self.thread = [None, None]                          # list of thread for the computation
+        self.play = False                                   # current state of the webcam
         self.list_choice_camera = ["None", "Imaging Source camera", "From File"] # hold every possible image source 
         self.path_to_dll = path_to_dll
-        self.camera = None                  # Camera object, see cam.py, only initialized when selecting a camera
-        self.reflection = None              # DiscoveredSign object, only initialized when the reflection detection starts
-        self.circle = circles.Circle(circle_threshold)   # Circle object, hold parameter for the detection
+        self.camera = None                                  # Camera object, see cam.py, only initialized when selecting a camera
+        self.reflection = discovered_sign.DiscoveredSign()  # DiscoveredSign object, only initialized when the reflection detection starts
+        self.circle = circles.Circle(circle_threshold)      # Circle object, hold parameter for the detection
         self.image_to_draw = [None, None]
         self.i = 0 # TEMP
 
@@ -58,13 +58,25 @@ class UI:
         
         self.widgets["start_reflection"] = Button(left_frame, text="Start Reflection", command=self.startResetReflection)
 
+        self.widgets["reset_reflection"] = Button(left_frame, text="Reset Reflection", command=self.reflection.resetLight)
+
+        scale_threshold_light = Scale(left_frame, from_=1, to=100, orient=HORIZONTAL, 
+                             label="Select the threshold value for the light detection", length=250,
+                             command=self.reflection.set_threshold)
+        scale_threshold.set(self.reflection.threshold_intensity)
+        self.widgets["scale_threshold_light"] = scale_threshold_light
+
+
         # packing all the left widget to the frame
         self.widgets["change_camera"].pack(fill=X)
 
         self.widgets["scale_threshold"].pack(fill=X)
         
         self.widgets["start_camera"].pack(fill=X)
+        self.widgets["reset_reflection"].pack(fill=X)
         self.widgets["start_reflection"].pack(fill=X)
+
+        self.widgets["scale_threshold_light"].pack(fill=X)
 
 
         # ==================================
@@ -231,7 +243,7 @@ class UI:
             self.camera = cam.Camera(self.path_to_dll)
 
             height, width = self.camera.getImageSize()
-            self.reflection = discovered_sign.DiscoveredSign(height, width)
+            self.reflection.initialization(height, width)
             # if cancel button has been pressed, bugs WILL happened
             pass
         elif (selection == self.list_choice_camera[2]): # from image
