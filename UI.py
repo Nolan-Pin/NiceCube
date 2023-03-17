@@ -32,8 +32,16 @@ class UI:
         pass
 
     def run(self):
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.root.mainloop()
         pass
+
+    def close(self):
+        """This function makes sure everything is well setup to be correctly closed"""
+        print("Closing the app...")
+        self.play = 0
+        self.root.destroy()
+        print("Program closed")
 
     def constructFrame(self):
         """
