@@ -22,7 +22,8 @@ class Circle:
         Returns:
         [[x_center, y_center, radius], ... ]
         """
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        #gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        gray = image
         gray_blurred = cv2.blur(gray, (3, 3))
         
         detected_circles = cv2.HoughCircles(gray_blurred, cv2.HOUGH_GRADIENT, 1, 
@@ -39,7 +40,8 @@ class Circle:
 
 def drawCircle(image, list_point):
     """
-    Draw circle defined by the point in the given list on the image and return it
+    Draw circle defined by the point in the given list on the image
+    Return the original image
     
     Parameters:
     image: Mat
@@ -48,6 +50,7 @@ def drawCircle(image, list_point):
     Return:
     image: Mat
     """
+    original_image = np.copy(image)
     for point in list_point:
         cv2.circle(image, (point[0], point[1]), point[2], (0, 0, 255), 3)
-    return image
+    return original_image

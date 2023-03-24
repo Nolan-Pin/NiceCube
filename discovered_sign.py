@@ -26,6 +26,11 @@ class DiscoveredSign:
     def getCenter(self):
         return self.center[0], self.center[1]
     
+    def set_center(self, coord):
+        x , y = coord
+        self.center = int(x), int(y)
+        pass
+     
     def set_threshold(self, new_value):
         self.threshold_intensity = int(new_value)
         pass
@@ -69,7 +74,14 @@ class DiscoveredSign:
         pass
 
     def resetLight(self):
-        self.light_map = np.zeros((self.width, self.height,3),np.uint8)
+        #self.light_map = np.zeros((self.width, self.height,3),np.uint8)
+        self.light_map = np.zeros((self.width, self.height),np.uint8)
+    
+    def find_center(self):
+        img = self.light_map
+        self.set_center(np.argwhere(img==255).mean(0))
+        pass
+
     pass
 
 

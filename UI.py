@@ -20,7 +20,7 @@ class UI:
         self.camera = None                                  # Camera object, see cam.py, only initialized when selecting a camera
         self.reflection = discovered_sign.DiscoveredSign()  # DiscoveredSign object, only initialized when the reflection detection starts
         self.circle = circles.Circle(circle_threshold)      # Circle object, hold parameter for the detection
-        self.image_to_draw = [None, None]
+        self.image_to_draw = [None, None, None]             # 0: img from cam, 1: img with circle, 2: light detection
         self.i = 0 # TEMP
 
         self.root = Tk()
@@ -54,12 +54,12 @@ class UI:
         self.widgets["start_camera"] = Button(left_frame, text="Start Camera", command=self.startStopCamera)
         
         scale_threshold = Scale(left_frame, from_=1, to=100, orient=HORIZONTAL, 
-                             label="Select the threshold value", length=250,
+                             label="Select the threshold value for the circle detection", length=250,
                              command=self.updateCircleThreshold)
         scale_threshold.set(self.circle.threshold)
         self.widgets["scale_threshold"] = scale_threshold
         
-        # self.widgets["change_camera"] = Button(left_frame, text="Change camera" , command=self.camera.setCamera)
+        self.widgets["change_camera456456"] = Button(left_frame, text="4564 camera" , command=self.reflection.find_center).pack()
         self.widgets["change_camera"] = ttk.Combobox(left_frame, values=self.list_choice_camera)
         self.widgets["change_camera"].current(0)
         self.widgets["change_camera"].bind("<<ComboboxSelected>>", self.choose_camera)
@@ -78,12 +78,12 @@ class UI:
         # packing all the left widget to the frame
         self.widgets["change_camera"].pack(fill=X)
 
-        self.widgets["scale_threshold"].pack(fill=X)
         
         self.widgets["start_camera"].pack(fill=X)
-        self.widgets["reset_reflection"].pack(fill=X)
         self.widgets["start_reflection"].pack(fill=X)
+        self.widgets["reset_reflection"].pack(fill=X)
 
+        self.widgets["scale_threshold"].pack(fill=X)
         self.widgets["scale_threshold_light"].pack(fill=X)
 
 
@@ -91,14 +91,19 @@ class UI:
         # right side for the image and video
         self.widgets["right_frame"] = right_frame = Frame(self.root, width=300, height=300)
 
+
+        scale = 120
+        width = 4*scale
+        height = 3*scale
         self.widgets["image_output"] = Label(right_frame)
         self.widgets["image_output_bis"] = Label(right_frame)
 
-        self.widgets["image_output"].pack(fill=BOTH, expand=True)
-        self.widgets["image_output_bis"].pack(fill=BOTH, expand=True)
+        self.widgets["image_output"].pack(fill=BOTH, expand=True, side=LEFT)
+        self.widgets["image_output_bis"].pack(fill=BOTH, expand=True, side=LEFT)
 
-        left_frame.pack(fill=BOTH, expand=True, side=LEFT)
-        right_frame.pack(fill=BOTH, expand=True, side=LEFT)
+
+        left_frame.pack(fill=BOTH, expand=True, side=TOP)
+        right_frame.pack(fill=BOTH, expand=True, side=BOTTOM)
 
         pass
 
@@ -145,20 +150,20 @@ class UI:
             image_output = self.widgets["image_output"]
             image_output_bis = self.widgets["image_output_bis"]
 
-            # Draw the first image -> live feed
-            image = self.image_to_draw[0]
+            # Draw the second image -> live feed
+            image = self.image_to_draw[1]
             if image is not None:    
-                image = ImageOpencvToTkinter(image)
+                image = self.ImageOpencvToTkinter(image)
             image_output.imgtk = image
             image_output.configure(image=image)
 
-            # Draw the second image -> reflection
-            image = self.image_to_draw[1]
+            # Draw the third image -> reflection
+            image = self.image_to_draw[2]
             if image is not None:
-                image = ImageOpencvToTkinter(image)
+                image = self.ImageOpencvToTkinter(image)
             image_output_bis.imgtk = image
             image_output_bis.configure(image=image)
-
+            
             image_output.after(20, self.update_all_image)
         pass
 
@@ -173,9 +178,10 @@ class UI:
             img = self.camera.getImage()
 
             list_point = self.circle.detectCircle(img)
-            img = circles.drawCircle(img, list_point)
+            original_image = circles.drawCircle(img, list_point)
+            self.image_to_draw[0] = original_image
 
-            self.image_to_draw[0] = img
+            self.image_to_draw[1] = img
 
             time.sleep(0.02)
         return
@@ -191,7 +197,7 @@ class UI:
             reflection = self.reflection.detectReflexion(image_input)
             self.reflection.addNewReflection(reflection)
 
-            self.image_to_draw[1] = self.reflection.light_map
+            self.image_to_draw[2] = self.reflection.light_map
         return
 
     def updateImageLive(self):
@@ -207,7 +213,7 @@ class UI:
             list_point = self.circle.detectCircle(img)
             img = circles.drawCircle(img, list_point)
 
-            img = ImageOpencvToTkinter(img)
+            img = self.ImageOpencvToTkinter(img)
             # update image on tkinter window
             image_output.imgtk = img
             image_output.configure(image=img)
@@ -230,7 +236,7 @@ class UI:
         reflection = self.reflection.detectReflexion(image_input)
         self.reflection.addNewReflection(reflection)
 
-        img = ImageOpencvToTkinter(self.reflection.light_map)
+        img = self.ImageOpencvToTkinter(self.reflection.light_map)
         # update image on tkinter window
         image_output_bis.imgtk = img
         image_output_bis.configure(image=img)
@@ -274,7 +280,7 @@ class UI:
             if (self.i == 2):
                 self.i = 0
             
-            img = ImageOpencvToTkinter(img)
+            img = self.ImageOpencvToTkinter(img)
             # update image on tkinter window
             image_output.imgtk = img
             image_output.configure(image=img)
@@ -286,21 +292,17 @@ class UI:
         pass
 
 
-def ImageOpencvToTkinter(img):
-    """
-    convert opencv image format to a tkinter format
-    """
-    # get the color right
-    b,g,r = cv2.split(img)
-    img = cv2.merge((r,g,b))
+    def ImageOpencvToTkinter(self, img):
+        """
+        convert opencv image format to a tkinter format
+        """
+        # convertion
+        img = PIL.Image.fromarray(img)
+        img = PIL.ImageTk.PhotoImage(img)
+        return img
 
-    # convertion
-    img = PIL.Image.fromarray(img)
-    img = PIL.ImageTk.PhotoImage(img)
 
-    return img
-
-ui = UI(100, "./studysession/Lib/site-packages/tisgrabber/samples/tisgrabber_x64.dll")
+ui = UI(100, "./Lib/site-packages/tisgrabber/samples/tisgrabber_x64.dll")
 ui.setup()
 
 

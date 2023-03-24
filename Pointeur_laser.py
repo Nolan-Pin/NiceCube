@@ -3,8 +3,8 @@ import numpy as np
 Represente le cercle du laser
 """
 class Pointeur_laser :
-    def __init__(self, posX, posY, input_r):
-        self.start = [posX, posY]
+    def __init__(self, input_r):
+        self.start = [0, 0]
         self.rayon = input_r
         self.centerCircle = [0,0] #coordonnées polaires rayon / angle
 
@@ -13,8 +13,6 @@ class Pointeur_laser :
         self.nb_pas = 50
         self.pas_angle = 2 * np.pi / self.nb_pas
         self.pas_rayon = 2 * self.rayon / self.nb_pas
-
-
         pass
 
     """
