@@ -14,7 +14,8 @@ class UI:
     def __init__(self, circle_threshold, path_to_dll) -> None:
         self.widgets = {}                                   # holds all the widgets of the window
         self.thread = [None, None]                          # list of thread for the computation
-        self.play = False                                   # current state of the webcam
+        self.is_camera_on = False                                   # current state of the webcam
+        self.is_reflect_on = False                                   # current state of the reflection's detection
         self.list_choice_camera = ["None", "Imaging Source camera", "From File"] # hold every possible image source 
         self.path_to_dll = path_to_dll
         self.camera = None                                  # Camera object, see cam.py, only initialized when selecting a camera
@@ -39,7 +40,8 @@ class UI:
     def close(self):
         """This function makes sure everything is well setup to be correctly closed"""
         print("Closing the app...")
-        self.play = 0
+        self.is_camera_on = False
+        #self.reflect
         self.root.destroy()
         print("Program closed")
 
@@ -64,7 +66,7 @@ class UI:
         self.widgets["change_camera"].current(0)
         self.widgets["change_camera"].bind("<<ComboboxSelected>>", self.choose_camera)
         
-        self.widgets["start_reflection"] = Button(left_frame, text="Start Reflection", command=self.startResetReflection)
+        self.widgets["start_reflection"] = Button(left_frame, text="Start Reflection", command=self.startStopReflection)
 
         self.widgets["reset_reflection"] = Button(left_frame, text="Reset Reflection", command=self.reflection.resetLight)
 
@@ -107,52 +109,94 @@ class UI:
 
         pass
 
+
+    # Managing State of the camera =======================================
+    def camera_start(self):
+        self.is_camera_on = True
+        self.camera.startCamera()
+        self.thread[0] = threading.Thread(target=self.compute_circle)
+        self.thread[0].start()
+        self.camera_change_button_prefix("Stop")
+
+        print("Camera started")
+        pass
+    
+    def camera_stop(self):
+        self.is_camera_on = False
+        self.camera.stopCamera()
+        self.camera_change_button_prefix("Start")
+
+        self.reflection_stop()
+        print("Camera (and reflection) stopped")
+        pass
+
+    def camera_change_button_prefix(self, new_prefix: str):
+        self.widgets["start_camera"].configure(text=(new_prefix + " Camera"))
+        pass   
+
     def startStopCamera(self):
-        """
-        Choosing the action to make and the text to show on the button depending of the state of the camera
-        If it is already running, it is stopped then the button is labeled "Start Camera"
-        If it is not, it is started and the button is labeled "Stop Camera"
-        """
-        if (self.play):
-            # stoping the camera
-            self.camera.stopCamera()
-            label = "Start "
+        """Choosing the action to make depending of the state of the camera"""
+        if self.is_camera_on:
+            # stoping the camera (and the reflection)
+            self.camera_stop()
         else:
             # starting the camera
-            self.camera.startCamera()
-            label = "Stop "
-            self.thread[0] = threading.Thread(target=self.compute_circle)
-            self.thread[0].start()
-        self.widgets["start_camera"].configure(text=(label + "Camera"))
-        self.play = not self.play
+            self.camera_start()
 
         self.update_all_image()
-        # self.updateImageLive()
+        pass
+    # ====================================================================
+
+    # Managing state of the reflection ===================================
+    def reflection_start(self):
+        self.is_reflect_on = True
+        
+        self.reflection.resetLight()
+        self.thread[1] = threading.Thread(target=self.compute_reflection)
+        self.thread[1].start()
+
+        self.reflection_change_button_prefix("Stop")
+        print("Reflection started")
         pass
 
-    def startResetReflection(self):
+    def reflection_stop(self):
+        self.is_reflect_on = False
+        self.reflection_change_button_prefix("Start")
+        print("Reflection stopped")
+        pass
+
+    def reflection_change_button_prefix(self, new_prefix: str):
+        self.widgets["start_reflection"].configure(text=(new_prefix + " Reflection"))
+        pass    
+
+    def startStopReflection(self):
         """
-        This function declare the DiscorveredSign object then starts the detection frame by frame
+        Choosing the action to make depending of the state of the reflection\n
         The camera must be started before calling this function
         """
-        if self.play:
-            # self.updateImageReflection()
-            self.reflection.resetLight()
-            self.thread[1] = threading.Thread(target=self.compute_reflection)
-            self.thread[1].start()
+        if not self.is_camera_on and not self.is_reflect_on:
+            # Stop the function here because condition are not respected
+            print("Camera must be ON")
+            return
+
+        if self.is_reflect_on:
+            self.reflection_stop()
+        else:
+            self.reflection_start()
         pass
+    # ====================================================================
 
     def update_all_image(self):
         """
         This function will update all the image to draw on the tkinter window
         """
-        if self.play:
+        if self.is_camera_on:
             image_output = self.widgets["image_output"]
             image_output_bis = self.widgets["image_output_bis"]
-
+ 
             # Draw the second image -> live feed
             image = self.image_to_draw[1]
-            if image is not None:    
+            if image is not None:   
                 image = self.ImageOpencvToTkinter(image)
             image_output.imgtk = image
             image_output.configure(image=image)
@@ -173,8 +217,7 @@ class UI:
         then draw the circle on the image
         Save the result image in the first slot of the "image_to_draw" attribute
         """
-        time.sleep(1)
-        while self.play:
+        while self.is_camera_on:
             img = self.camera.getImage()
 
             list_point = self.circle.detectCircle(img)
@@ -191,7 +234,7 @@ class UI:
         This function uses the DiscovredSign object to compute the reflection between 2 frames
         Save the result image in the second slot of the "image_to_draw" attribute
         """
-        while self.play:            
+        while self.is_camera_on and self.is_reflect_on:   
             image_input = self.image_to_draw[0]
 
             reflection = self.reflection.detectReflexion(image_input)
@@ -207,7 +250,7 @@ class UI:
         It also detect circle with the threshold chosen with the "scale_threshold" widget
         """
         image_output = self.widgets["image_output"]
-        if self.play:
+        if self.is_camera_on:
             img = self.camera.getImage()
 
             list_point = self.circle.detectCircle(img)
@@ -267,14 +310,14 @@ class UI:
 
     # TEMP
     def updateImageBis(self):
-        self.play = True
+        self.is_camera_on = True
         image_output = self.widgets["image_output"]
         list_image = [cv2.imread("IC Camera/1.bmp"), 
                       cv2.imread("IC Camera/2.bmp"), 
                       cv2.imread("IC Camera/3.bmp"), 
                       cv2.imread("IC Camera/4.bmp"),
                       cv2.imread("IC Camera/5.bmp")]
-        if self.play:
+        if self.is_camera_on:
             img = list_image[self.i]
             self.i += 1
             if (self.i == 2):

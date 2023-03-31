@@ -29,23 +29,21 @@ class DiscoveredSign:
     def set_center(self, coord):
         x , y = coord
         self.center = int(x), int(y)
+        print(self.center)
         pass
      
     def set_threshold(self, new_value):
         self.threshold_intensity = int(new_value)
         pass
     
-    def detectReflexion(self, image1):
+    def detectReflexion(self, image1: cv2.Mat) -> cv2.Mat:
         """
-        This function is comparing the given image and the stored one, these image should be almost identical image (ex: 2 successive frames of a video)
-        Its goal is to detect a new high intensity region in the second image which would correspond to the reflection against the CornerCube
-        or the road sign used
-        It does that by applying a threshold an both image to eliminate low intensity region and then substract one image to the other
+        This function is comparing the given image and the stored one, 
+        these image should be almost identical image (ex: 2 successive frames of a video)\n
+        Its goal is to detect a new high intensity region in the second image 
+        which would correspond to the reflection against the CornerCube or the road sign used\n
+        It does that by applying a threshold an both image to eliminate low intensity region and then substract one image to the other\n
         If a new high intensity region has appeared between the image, it will be the only region of the image where pixel are not 0
-
-        Parameters:
-        image1: Mat
-        image2: Mat
         """
         # the second image is loaded to make computation
         image2 = self.saved_image
@@ -63,12 +61,9 @@ class DiscoveredSign:
         th, new_mat = cv2.threshold(new_mat, self.threshold_intensity, 255, cv2.THRESH_BINARY)
         return new_mat
     
-    def addNewReflection(self, reflected):
+    def addNewReflection(self, reflected: cv2.Mat):
         """
         This function will add region of light into the "light_map" matrix
-
-        Parameter:
-        reflected: Mat - should be mostly 0
         """
         self.light_map = cv2.add(self.light_map, reflected)
         pass
@@ -78,8 +73,16 @@ class DiscoveredSign:
         self.light_map = np.zeros((self.width, self.height),np.uint8)
     
     def find_center(self):
+        """
+        This function compute the location of the average white pixel of "self.light_map"\n
+        It uses numpy for a more efficient computation\n\n
+        As "self.light_map" is a matrix, numpy return the center with inverted coordinate [y, x]\n
+        This is why the coordinate are swapped right before the affectection
+        """
         img = self.light_map
-        self.set_center(np.argwhere(img==255).mean(0))
+
+        center_inverted = np.argwhere(img==255).mean(0)
+        self.set_center( (center_inverted[1], center_inverted[0]) )
         pass
 
     pass

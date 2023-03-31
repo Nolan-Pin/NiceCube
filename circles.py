@@ -38,19 +38,16 @@ class Circle:
         return []
 
 
-def drawCircle(image, list_point):
+def drawCircle(image: cv2.Mat, list_point: list[list[int]]):
     """
     Draw circle defined by the point in the given list on the image
     Return the original image
-    
-    Parameters:
-    image: Mat
-    list_point: [[x_center, y_center, radius], ...]
-    
+    Arguments "list_point" is in the form [ [x, y, rayon] ]
+
     Return:
     image: Mat
     """
     original_image = np.copy(image)
     for point in list_point:
-        cv2.circle(image, (point[0], point[1]), point[2], (0, 0, 255), 3)
+        cv2.circle(image, (point[0], point[1]), point[2], (0, 0, 0), 3)
     return original_image
