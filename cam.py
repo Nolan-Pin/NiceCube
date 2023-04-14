@@ -3,7 +3,7 @@ import numpy as np
 import ctypes
 import tisgrabber as tis
 
-import Pointeur_laser as Laser
+import laser as Laser
 import Panneau
 import discovered_sign
 

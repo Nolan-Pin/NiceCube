@@ -8,10 +8,12 @@ class DiscoveredSign:
     def __init__(self):
         self.width = 0
         self.height = 0
-        self.center = [0, 0]
+        self.center = [-1, -1]
+        self.number_of_white_pixel = 0
         self.light_map = None
 
         self.threshold_intensity = 100
+        self.threshold_detected = 0
         
         self.saved_image = None
         pass
@@ -20,6 +22,7 @@ class DiscoveredSign:
     def initialization(self, height, width):
         self.width = height
         self.height = width
+        self.threshold_detected = width/9 * height/6 * 1/16
         self.resetLight()
         pass
 
@@ -61,6 +64,7 @@ class DiscoveredSign:
         th, new_mat = cv2.threshold(new_mat, self.threshold_intensity, 255, cv2.THRESH_BINARY)
         return new_mat
     
+
     def addNewReflection(self, reflected: cv2.Mat):
         """
         This function will add region of light into the "light_map" matrix
@@ -68,20 +72,24 @@ class DiscoveredSign:
         self.light_map = cv2.add(self.light_map, reflected)
         pass
 
+
     def resetLight(self):
         #self.light_map = np.zeros((self.width, self.height,3),np.uint8)
         self.light_map = np.zeros((self.width, self.height),np.uint8)
     
+
     def find_center(self):
         """
         This function compute the location of the average white pixel of "self.light_map"\n
         It uses numpy for a more efficient computation\n\n
         As "self.light_map" is a matrix, numpy return the center with inverted coordinate [y, x]\n
-        This is why the coordinate are swapped right before the affectection
+        This is why the coordinate are swapped right before the affectection\n
+        Also compute the number of white pixel in the image, it will be used to detect when a sufficient part of reflection is detected
         """
         img = self.light_map
 
-        center_inverted = np.argwhere(img==255).mean(0)
+        self.number_of_white_pixel = np.argwhere(img==255)
+        center_inverted = self.number_of_white_pixel.mean(0)
         self.set_center( (center_inverted[1], center_inverted[0]) )
         pass
 

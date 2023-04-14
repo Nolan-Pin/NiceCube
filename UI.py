@@ -5,26 +5,34 @@ import time
 import PIL.Image
 import PIL.ImageTk
 import cv2
+import ctypes
 
 import cam
 import circles
 import discovered_sign
+import laser
+
+ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
 class UI:
     def __init__(self, circle_threshold, path_to_dll) -> None:
         self.widgets = {}                                   # holds all the widgets of the window
         self.thread = [None, None]                          # list of thread for the computation
+        self.image_to_draw = [None, None, None]             # 0: img from cam, 1: img with circle, 2: light detection
+
+        self.circle = circles.Circle(circle_threshold)      # Circle object, hold parameter for the detection
         self.is_camera_on = False                                   # current state of the webcam
         self.is_reflect_on = False                                   # current state of the reflection's detection
         self.list_choice_camera = ["None", "Imaging Source camera", "From File"] # hold every possible image source 
         self.path_to_dll = path_to_dll
         self.camera = None                                  # Camera object, see cam.py, only initialized when selecting a camera
         self.reflection = discovered_sign.DiscoveredSign()  # DiscoveredSign object, only initialized when the reflection detection starts
-        self.circle = circles.Circle(circle_threshold)      # Circle object, hold parameter for the detection
-        self.image_to_draw = [None, None, None]             # 0: img from cam, 1: img with circle, 2: light detection
-        self.i = 0 # TEMP
+        self.laser = laser.laser()
+        self.laser_position_to_send = [0, 0]
+
 
         self.root = Tk()
+        self.root.geometry("1600x900")
         pass
 
 
@@ -41,7 +49,7 @@ class UI:
         """This function makes sure everything is well setup to be correctly closed"""
         print("Closing the app...")
         self.is_camera_on = False
-        #self.reflect
+        self.is_reflect_on = False
         self.root.destroy()
         print("Program closed")
 
@@ -50,62 +58,58 @@ class UI:
         Create and place every widget of the window
         Using a dictionnary to make it easier to access every widget from any point of the program
         """
-        # left side where all the button are
-        self.widgets["left_frame"] = left_frame =  ttk.Frame(self.root)
+        width = 20
+        height = 1
 
-        self.widgets["start_camera"] = Button(left_frame, text="Start Camera", command=self.startStopCamera)
+        # The frame is split in two part
+        self.widgets["left_frame"] = left_frame = ttk.Frame(self.root)
+        self.widgets["right_frame"] = right_frame = ttk.Frame(self.root)
+
+        self.widgets["start_camera"] = Button(left_frame, text="Start Camera", command=self.startStopCamera, width=width, height=height)
         
         scale_threshold = Scale(left_frame, from_=1, to=100, orient=HORIZONTAL, 
-                             label="Select the threshold value for the circle detection", length=250,
+                             label="Threshold for the circle detection", length=250,
                              command=self.updateCircleThreshold)
         scale_threshold.set(self.circle.threshold)
         self.widgets["scale_threshold"] = scale_threshold
         
-        self.widgets["change_camera456456"] = Button(left_frame, text="4564 camera" , command=self.reflection.find_center).pack()
-        self.widgets["change_camera"] = ttk.Combobox(left_frame, values=self.list_choice_camera)
-        self.widgets["change_camera"].current(0)
-        self.widgets["change_camera"].bind("<<ComboboxSelected>>", self.choose_camera)
-        
-        self.widgets["start_reflection"] = Button(left_frame, text="Start Reflection", command=self.startStopReflection)
+        self.widgets["center_reflection"] = Label(right_frame, text="center : [0, 0]")
 
-        self.widgets["reset_reflection"] = Button(left_frame, text="Reset Reflection", command=self.reflection.resetLight)
+        self.widgets["set_camera"] = Button(left_frame, text="Set camera", command=self.set_camera, width=width, height=height)
 
-        scale_threshold_light = Scale(left_frame, from_=1, to=100, orient=HORIZONTAL, 
-                             label="Select the threshold value for the light detection", length=250,
+        self.widgets["start_reflection"] = Button(right_frame, text="Start Reflection", command=self.startStopReflection, width=width, height=height)
+        self.widgets["reset_reflection"] = Button(right_frame, text="Reset Reflection", command=self.reflection.resetLight, width=width, height=height)
+
+        scale_threshold_light = Scale(right_frame, from_=1, to=100, orient=HORIZONTAL, 
+                             label="Threshold for the light detection", length=250,
                              command=self.reflection.set_threshold)
-        scale_threshold.set(self.reflection.threshold_intensity)
+        scale_threshold_light.set(self.reflection.threshold_intensity)
         self.widgets["scale_threshold_light"] = scale_threshold_light
 
 
-        # packing all the left widget to the frame
-        self.widgets["change_camera"].pack(fill=X)
+        # packing all the top widget to the frame
+        self.widgets["set_camera"].pack()
+        self.widgets["start_camera"].pack()
+        self.widgets["scale_threshold"].pack()
 
-        
-        self.widgets["start_camera"].pack(fill=X)
-        self.widgets["start_reflection"].pack(fill=X)
-        self.widgets["reset_reflection"].pack(fill=X)
+        self.widgets["start_reflection"].pack()
+        self.widgets["reset_reflection"].pack()
+        self.widgets["scale_threshold_light"].pack()
+        self.widgets["center_reflection"].pack()
 
-        self.widgets["scale_threshold"].pack(fill=X)
-        self.widgets["scale_threshold_light"].pack(fill=X)
 
 
         # ==================================
-        # right side for the image and video
-        self.widgets["right_frame"] = right_frame = Frame(self.root, width=300, height=300)
+        # Bottom side for the image and video
 
-
-        scale = 120
-        width = 4*scale
-        height = 3*scale
-        self.widgets["image_output"] = Label(right_frame)
+        self.widgets["image_output"] = Label(left_frame)
         self.widgets["image_output_bis"] = Label(right_frame)
 
-        self.widgets["image_output"].pack(fill=BOTH, expand=True, side=LEFT)
-        self.widgets["image_output_bis"].pack(fill=BOTH, expand=True, side=LEFT)
+        self.widgets["image_output"].pack(fill=BOTH, expand=True, side=BOTTOM)
+        self.widgets["image_output_bis"].pack(fill=BOTH, expand=True, side=BOTTOM)
 
-
-        left_frame.pack(fill=BOTH, expand=True, side=TOP)
-        right_frame.pack(fill=BOTH, expand=True, side=BOTTOM)
+        left_frame.pack(fill=BOTH, expand=True, side=LEFT)
+        right_frame.pack(fill=BOTH, expand=True, side=RIGHT)
 
         pass
 
@@ -186,6 +190,13 @@ class UI:
         pass
     # ====================================================================
 
+    def center_update(self):
+        center = self.widgets["center_reflection"]
+        coord = self.reflection.getCenter()
+        coord = "Center : [" + str(coord[0]) + ", " + str(coord[1]) + "]"
+        center.configure(text=coord)
+
+
     def update_all_image(self):
         """
         This function will update all the image to draw on the tkinter window
@@ -205,9 +216,10 @@ class UI:
             image = self.image_to_draw[2]
             if image is not None:
                 image = self.ImageOpencvToTkinter(image)
-            image_output_bis.imgtk = image
             image_output_bis.configure(image=image)
             
+            self.center_update()
+            self.next_movement_computing()
             image_output.after(20, self.update_all_image)
         pass
 
@@ -293,56 +305,40 @@ class UI:
     pass
 
 
-    # TEMP
-    def choose_camera(self, event):
-        selection = self.widgets["change_camera"].get()
-        if (selection == self.list_choice_camera[1]): # imaging source camera
-            self.camera = cam.Camera(self.path_to_dll)
+    def set_camera(self):
 
-            height, width = self.camera.getImageSize()
-            self.reflection.initialization(height, width)
-            # if cancel button has been pressed, bugs WILL happened
-            pass
-        elif (selection == self.list_choice_camera[2]): # from image
-            self.updateImageBis()
-            pass
+        self.camera = cam.Camera(self.path_to_dll)
+        height, width = self.camera.getImageSize()
+        self.reflection.initialization(height, width)
         pass
-
-    # TEMP
-    def updateImageBis(self):
-        self.is_camera_on = True
-        image_output = self.widgets["image_output"]
-        list_image = [cv2.imread("IC Camera/1.bmp"), 
-                      cv2.imread("IC Camera/2.bmp"), 
-                      cv2.imread("IC Camera/3.bmp"), 
-                      cv2.imread("IC Camera/4.bmp"),
-                      cv2.imread("IC Camera/5.bmp")]
-        if self.is_camera_on:
-            img = list_image[self.i]
-            self.i += 1
-            if (self.i == 2):
-                self.i = 0
-            
-            img = self.ImageOpencvToTkinter(img)
-            # update image on tkinter window
-            image_output.imgtk = img
-            image_output.configure(image=img)
-            image_output.after(2000, self.updateImageBis)
-            pass
-        else:
-            image_output.imgtk = None
-            image_output.configure(image=None)
-        pass
-
 
     def ImageOpencvToTkinter(self, img):
         """
         convert opencv image format to a tkinter format
         """
-        # convertion
-        img = PIL.Image.fromarray(img)
+        width = int(self.root.winfo_width()*0.45)
+        height = int(self.root.winfo_height()*0.45)
+        img_resized = cv2.resize(img, (width, height))
+        img = PIL.Image.fromarray(img_resized)
         img = PIL.ImageTk.PhotoImage(img)
         return img
+    
+    def next_movement_computing(self) -> None:
+        """
+        This function choose between continuing the normal detection cycle\n
+        or moving to the detected area
+        """
+        self.laser.new_pos()
+
+        if (self.reflection.number_of_white_pixel  <  self.reflection.threshold_detected):
+            self.laser_position_to_send = self.laser.current_pos_polar
+        else:
+            self.laser_position_to_send = self.reflection.center
+            self.laser.set_center( self.reflection.center )
+            self.laser.reset_polar_coordinate()
+            pass
+        pass
+
 
 
 ui = UI(100, "./Lib/site-packages/tisgrabber/samples/tisgrabber_x64.dll")
