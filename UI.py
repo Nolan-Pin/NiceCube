@@ -65,33 +65,47 @@ class UI:
         self.widgets["left_frame"] = left_frame = ttk.Frame(self.root)
         self.widgets["right_frame"] = right_frame = ttk.Frame(self.root)
 
+        # Left frame
+        self.widgets["set_camera"] = Button(left_frame, text="Set camera", command=self.set_camera, width=width, height=height)
+
         self.widgets["start_camera"] = Button(left_frame, text="Start Camera", command=self.startStopCamera, width=width, height=height)
-        
+
         scale_threshold = Scale(left_frame, from_=1, to=100, orient=HORIZONTAL, 
                              label="Threshold for the circle detection", length=250,
                              command=self.updateCircleThreshold)
         scale_threshold.set(self.circle.threshold)
         self.widgets["scale_threshold"] = scale_threshold
-        
-        self.widgets["center_reflection"] = Label(right_frame, text="center : [0, 0]")
 
-        self.widgets["set_camera"] = Button(left_frame, text="Set camera", command=self.set_camera, width=width, height=height)
+        self.widgets["laser_move_to_do"] = Label(left_frame, text="Next laser movement: [0, 0]")
 
+        scale_threshold.set(self.circle.threshold)
+        self.widgets["scale_threshold"] = scale_threshold
+
+
+
+        # Right frame
         self.widgets["start_reflection"] = Button(right_frame, text="Start Reflection", command=self.startStopReflection, width=width, height=height)
+        
         self.widgets["reset_reflection"] = Button(right_frame, text="Reset Reflection", command=self.reflection.resetLight, width=width, height=height)
-
+        
+        
         scale_threshold_light = Scale(right_frame, from_=1, to=100, orient=HORIZONTAL, 
                              label="Threshold for the light detection", length=250,
                              command=self.reflection.set_threshold)
         scale_threshold_light.set(self.reflection.threshold_intensity)
         self.widgets["scale_threshold_light"] = scale_threshold_light
 
+        self.widgets["center_reflection"] = Label(right_frame, text="center : [0, 0]")
 
-        # packing all the top widget to the frame
+
+        # packing all the non image widget to the frame
+        # Left
         self.widgets["set_camera"].pack()
         self.widgets["start_camera"].pack()
         self.widgets["scale_threshold"].pack()
+        self.widgets["laser_move_to_do"].pack()
 
+        # Right
         self.widgets["start_reflection"].pack()
         self.widgets["reset_reflection"].pack()
         self.widgets["scale_threshold_light"].pack()
@@ -108,8 +122,8 @@ class UI:
         self.widgets["image_output"].pack(fill=BOTH, expand=True, side=BOTTOM)
         self.widgets["image_output_bis"].pack(fill=BOTH, expand=True, side=BOTTOM)
 
-        left_frame.pack(fill=BOTH, expand=True, side=LEFT)
-        right_frame.pack(fill=BOTH, expand=True, side=RIGHT)
+        left_frame.pack(fill=BOTH, expand=True, side=LEFT, anchor=S)
+        right_frame.pack(fill=BOTH, expand=True, side=RIGHT, anchor=S)
 
         pass
 
@@ -147,7 +161,7 @@ class UI:
             # starting the camera
             self.camera_start()
 
-        self.update_all_image()
+        self.loop_update()
         pass
     # ====================================================================
 
@@ -191,13 +205,30 @@ class UI:
     # ====================================================================
 
     def center_update(self):
+        """
+        This function update the widget showing the coordinate of the center of the reflection detected
+        """
         center = self.widgets["center_reflection"]
         coord = self.reflection.getCenter()
         coord = "Center : [" + str(coord[0]) + ", " + str(coord[1]) + "]"
         center.configure(text=coord)
+        pass
+
+    count = 0
+    def laser_move_to_do_update(self):
+        """
+        this function update the widget showing the next wanted movement of the laser computed
+        """
+        if (self.count == 40):
+            self.count = 0
+            x, y = self.laser_position_to_send
+            widget = self.widgets["laser_move_to_do"]
+            move = "Next laser movement: [" + str(x) + "," + str(y) + "]"
+            widget.configure(text=move)
+        self.count += 1
 
 
-    def update_all_image(self):
+    def loop_update(self):
         """
         This function will update all the image to draw on the tkinter window
         """
@@ -216,11 +247,13 @@ class UI:
             image = self.image_to_draw[2]
             if image is not None:
                 image = self.ImageOpencvToTkinter(image)
+            image_output_bis.imgtk = image
             image_output_bis.configure(image=image)
             
             self.center_update()
             self.next_movement_computing()
-            image_output.after(20, self.update_all_image)
+            self.laser_move_to_do_update()
+            image_output.after(20, self.loop_update)
         pass
 
     def compute_circle(self):
@@ -252,52 +285,10 @@ class UI:
             reflection = self.reflection.detectReflexion(image_input)
             self.reflection.addNewReflection(reflection)
 
+            self.reflection.find_center()
             self.image_to_draw[2] = self.reflection.light_map
         return
-
-    def updateImageLive(self):
-        """
-        This function takes image from the video feed and output it on the widget "image_output"
-        Call itself every 20ms to get a constant video feed
-        It also detect circle with the threshold chosen with the "scale_threshold" widget
-        """
-        image_output = self.widgets["image_output"]
-        if self.is_camera_on:
-            img = self.camera.getImage()
-
-            list_point = self.circle.detectCircle(img)
-            img = circles.drawCircle(img, list_point)
-
-            img = self.ImageOpencvToTkinter(img)
-            # update image on tkinter window
-            image_output.imgtk = img
-            image_output.configure(image=img)
-            image_output.after(20, self.updateImageLive)
-            pass
-        else:
-            image_output.imgtk = None
-            image_output.configure(image=None)
-        pass
-
-    def updateImageReflection(self):
-        """
-        This function takes image from the video feed and output it on the widget "image_output2"
-        Call itself every 20ms to get a constant video feed
-        """
-        image_output_bis = self.widgets["image_output_bis"]
-        
-        image_input = self.camera.getImage()
-
-        reflection = self.reflection.detectReflexion(image_input)
-        self.reflection.addNewReflection(reflection)
-
-        img = self.ImageOpencvToTkinter(self.reflection.light_map)
-        # update image on tkinter window
-        image_output_bis.imgtk = img
-        image_output_bis.configure(image=img)
-
-        image_output_bis.after(100, self.updateImageReflection)
-        pass
+    
 
     def updateCircleThreshold(self, new_value):
         self.circle.threshold = int(new_value)
@@ -312,12 +303,13 @@ class UI:
         self.reflection.initialization(height, width)
         pass
 
+
     def ImageOpencvToTkinter(self, img):
         """
         convert opencv image format to a tkinter format
         """
-        width = int(self.root.winfo_width()*0.45)
-        height = int(self.root.winfo_height()*0.45)
+        width = int(self.root.winfo_width()*0.48)
+        height = int(self.root.winfo_height()*0.48)
         img_resized = cv2.resize(img, (width, height))
         img = PIL.Image.fromarray(img_resized)
         img = PIL.ImageTk.PhotoImage(img)
@@ -327,14 +319,15 @@ class UI:
         """
         This function choose between continuing the normal detection cycle\n
         or moving to the detected area
+        Stores it in the member "laser_position_to_send"
         """
         self.laser.new_pos()
 
         if (self.reflection.number_of_white_pixel  <  self.reflection.threshold_detected):
-            self.laser_position_to_send = self.laser.current_pos_polar
+            self.laser_position_to_send = self.laser.next_pos_cartesian
         else:
-            self.laser_position_to_send = self.reflection.center
-            self.laser.set_center( self.reflection.center )
+            self.laser_position_to_send = self.reflection.getCenter()
+            self.laser.set_center( self.reflection.getCenter() )
             self.laser.reset_polar_coordinate()
             pass
         pass

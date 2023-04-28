@@ -14,6 +14,9 @@ class DiscoveredSign:
 
         self.threshold_intensity = 100
         self.threshold_detected = 0
+        self.scale = 5
+
+        self.offset = [0, 0]
         
         self.saved_image = None
         pass
@@ -22,23 +25,26 @@ class DiscoveredSign:
     def initialization(self, height, width):
         self.width = height
         self.height = width
-        self.threshold_detected = width/9 * height/6 * 1/16
+        self.threshold_detected = width/9 * height/6 * 1/16 * self.scale
         self.resetLight()
         pass
+
 
     def getCenter(self):
         return self.center[0], self.center[1]
     
+
     def set_center(self, coord):
         x , y = coord
-        self.center = int(x), int(y)
-        print(self.center)
+        self.center = int(x) + self.offset[0], int(y) + self.offset[1]
         pass
-     
+
+
     def set_threshold(self, new_value):
         self.threshold_intensity = int(new_value)
         pass
     
+
     def detectReflexion(self, image1: cv2.Mat) -> cv2.Mat:
         """
         This function is comparing the given image and the stored one, 
@@ -88,9 +94,22 @@ class DiscoveredSign:
         """
         img = self.light_map
 
-        self.number_of_white_pixel = np.argwhere(img==255)
-        center_inverted = self.number_of_white_pixel.mean(0)
+        mat_white_pixel = np.argwhere(img==255)
+        self.number_of_white_pixel = len(mat_white_pixel)
+
+        if (not mat_white_pixel.any()):
+            center_inverted = [-1, -1]
+        else:
+            center_inverted = mat_white_pixel.mean(0)
         self.set_center( (center_inverted[1], center_inverted[0]) )
+        pass
+
+
+    def set_offset(self, x: int, y: int) -> None:
+        """
+        This function set the offset used when set_center is called
+        """
+        self.offset = [x, y]
         pass
 
     pass

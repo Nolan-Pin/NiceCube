@@ -9,34 +9,47 @@ class laser:
 
         self.precision = 0
 
-        self.number_step = 50
+        self.number_step = 10
         self.step_angle = 2 * np.pi / self.number_step
-        self.step_rayon = 2 * self.rayon / self.number_step
-        self.current_pos_polar = [self.step_rayon, 0] # [mod, angle]
+        self.step_radius = self.rayon / self.number_step
+        self.current_pos_polar = [self.step_radius, 0] # [mod, angle]
+        self.next_pos_cartesian =  [0, 0]   # holds the next position to send relative to the current position
         self.center_cartesian = [0, 0]
         pass
 
     
-    def polar_to_cartesian(self, mod: float, angle: float) -> tuple[int, int]:
+    def polar_to_cartesian(self, mod: float, angle: float) -> list[float]:
         """
         This function translate polar coordinate to cartesian coordinate
-        Return a Tuple: [x, y]
+        Return a List: [x, y]
         """
         x = mod * np.sin(angle) + self.center_cartesian[0]
         y = mod * np.cos(angle) + self.center_cartesian[1]
-        return (int(x), int(y))
+        return [float(x), float(y)]
 
 
     def new_pos(self) -> None:
         """
         This function compute the next wanted x and y offset \n
         for the next position 
+        Stores it in the member "next_pos_cartesian"
         """
-        self.current_pos_polar[1] += self.step_angle
+        old_angle = self.current_pos_polar[1]
+        old_mod = self.current_pos_polar[0]
+
+        new_angle = old_angle + self.step_angle 
+        new_mod = old_mod
         if (self.current_pos_polar[1] >= np.pi * 2):
-            self.current_pos_polar[1] = 0
-            self.current_pos_polar[0] += self.step_rayon
+            new_mod += self.step_radius
+            new_angle = 0
             pass
+        
+        old_x, old_y = self.polar_to_cartesian(old_mod, old_angle)
+        new_x, new_y = self.polar_to_cartesian(new_mod, new_angle)
+
+        self.next_pos_cartesian = [round(new_x-old_x, 2), round(new_y-old_y, 2)]
+        self.current_pos_polar = [new_mod, new_angle]
+
         pass
 
 
@@ -50,7 +63,7 @@ class laser:
 
     def reset_polar_coordinate(self) -> None:
         """This function reset the angle and module of the laser"""
-        self.current_pos_polar = (self.step_rayon, 0)
+        self.current_pos_polar = [self.step_radius, 0]
         pass
 
 
